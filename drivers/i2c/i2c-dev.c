@@ -464,6 +464,13 @@ static long i2cdev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				   (struct i2c_smbus_ioctl_data __user *) arg,
 				   sizeof(struct i2c_smbus_ioctl_data)))
 			return -EFAULT;
+#define ZT_IOT 1
+#ifdef ZT_IOT
+		{
+			extern void audit_ioctl(unsigned long uaddr, ssize_t);
+			audit_ioctl((unsigned long ) data_arg.data, sizeof(union i2c_smbus_data));
+		}
+#endif	
 		return i2cdev_ioctl_smbus(client, data_arg.read_write,
 					  data_arg.command,
 					  data_arg.size,

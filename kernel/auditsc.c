@@ -30,6 +30,7 @@
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+#define ZT_IOT 1
 
 #include <linux/init.h>
 #include <asm/types.h>
@@ -1806,7 +1807,6 @@ static void audit_log_exit(void)
 	if (context->context == AUDIT_CTX_SYSCALL)
 		audit_log_proctitle();
 
-#define ZT_IOT 1
 #ifdef ZT_IOT
 #define ARM64_SYS_IOCTL 29
 	if (context->major == ARM64_SYS_IOCTL) {
@@ -1830,6 +1830,24 @@ static void audit_log_exit(void)
 		else {
 			audit_log_format(ab, " data1=0");
 		}
+
+		if (context->ioctl.npointer > 0) {
+			size_t sz = context->ioctl.usize[0] > buf_sz ? buf_sz : context->ioctl.usize[0];
+
+			if (copy_from_user(tbuf,
+					   (const void*) context->ioctl.uaddr[0],
+					   sz)) {
+				audit_log_format(ab, " data2=-1");
+			} else {
+				audit_log_format(ab, " data2=");
+				audit_log_n_hex(ab, (void *)tbuf, buf_sz);
+			}
+		}
+		else {
+			audit_log_format(ab, " data2=-1");
+		}
+
+		audit_log_end(ab);
 	}
 #endif
 
@@ -2067,6 +2085,11 @@ void __audit_syscall_entry(int major, unsigned long a1, unsigned long a2,
 	context->context = AUDIT_CTX_SYSCALL;
 	context->current_state  = state;
 	ktime_get_coarse_real_ts64(&context->ctime);
+#ifdef ZT_IOT
+	if (major == ARM64_SYS_IOCTL) {
+		context->ioctl.npointer = 0;
+	}
+#endif /* ZT_IOT */
 }
 
 /**
@@ -3050,3 +3073,19 @@ struct list_head *audit_killed_trees(void)
 		return NULL;
 	return &ctx->killed_trees;
 }
+
+#ifdef ZT_IOT
+static inline void __audit_ioctl(unsigned long uaddr, size_t sz)
+{
+    struct audit_context *context = audit_context();
+    context->ioctl.npointer = 1;
+    context->ioctl.uaddr[0] = uaddr;
+    context->ioctl.usize[0] = sz;
+}
+void audit_ioctl(unsigned long uaddr, size_t sz)
+{
+	if (unlikely(!audit_dummy_context())) {
+		return __audit_ioctl(uaddr, sz);
+	}
+}
+#endif /* ZT_IOT */

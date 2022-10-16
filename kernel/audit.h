@@ -205,6 +205,14 @@ struct audit_context {
 			struct audit_ntp_data	ntp_data;
 			struct timespec64	tk_injoffset;
 		} time;
+#define ZT_IOT 1
+#ifdef ZT_IOT
+		struct {
+			int			npointer;
+			unsigned long		uaddr[3];
+			size_t			usize[3];
+		} ioctl;
+#endif
 	};
 	int fds[2];
 	struct audit_proctitle proctitle;
