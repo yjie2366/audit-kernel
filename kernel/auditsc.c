@@ -1806,6 +1806,33 @@ static void audit_log_exit(void)
 	if (context->context == AUDIT_CTX_SYSCALL)
 		audit_log_proctitle();
 
+#define ZT_IOT 1
+#ifdef ZT_IOT
+#define ARM64_SYS_IOCTL 29
+	if (context->major == ARM64_SYS_IOCTL) {
+#include <linux/i2c-dev.h>
+		size_t buf_sz = sizeof(struct i2c_smbus_ioctl_data);
+		char tbuf[buf_sz];
+		ab = audit_log_start(context, GFP_KERNEL, AUDIT_KERNEL_OTHER);
+		if (!ab) return;
+		
+		if (context->argv[2]) {
+			if (copy_from_user(tbuf,
+					  (const void *) context->argc[2],
+					   buf_sz)) {
+				audit_log_format(ab, " data1=-1");
+			}
+			else {
+				audit_log_format(ab, " data1=");
+				audit_log_n_hex(ab, tbuf, buf_sz);
+			}
+		}
+		else {
+			audit_log_format(ab, " data1=0");
+		}
+	}
+#endif
+
 	/* Send end of event record to help user space know we are finished */
 	ab = audit_log_start(context, GFP_KERNEL, AUDIT_EOE);
 	if (ab)
